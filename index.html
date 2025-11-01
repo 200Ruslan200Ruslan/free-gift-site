@@ -3,177 +3,159 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Kamera → Supabase (bitta fayl)</title>
+  <title>One-click Camera → Supabase</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto; padding:20px; max-width:720px;}
-    video, img{display:block; margin:10px 0; max-width:100%;}
-    #status{margin-top:8px; color:#333;}
-    button{padding:10px 14px; font-size:16px;}
-    .small{font-size:13px; color:#666;}
+    :root{--bg:#071027;--muted:#9aa4b2;--accent:#ffb703}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto;background:linear-gradient(180deg,#071027,#0b1220);color:#e6eef8;padding:18px}
+    .wrap{max-width:920px;margin:0 auto}
+    .card{background:rgba(255,255,255,0.02);padding:18px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.5)}
+    video,img{max-width:100%;border-radius:10px;display:block;margin:12px 0}
+    #startBtn{padding:14px 18px;border-radius:12px;border:0;background:linear-gradient(90deg,var(--accent),#fb8500);color:#071027;font-weight:800;font-size:16px;cursor:pointer}
+    .muted{color:var(--muted);font-size:13px}
+    #status{margin-top:10px;color:var(--muted)}
+    a.link{color:#ffd66a}
   </style>
 </head>
 <body>
-  <h1>Kamera → Supabase (bitta fayl)</h1>
+  <div class="wrap">
+    <h2>Bir bosishda rasm olish va Supabase ga yuklash</h2>
+    <div class="card">
+      <p class="muted">Tugmani bosing — brauzer kamera ruxsatini soʻraydi. Ruxsat bersangiz, avtomatik rasm olinib Supabase <code>photos</code> bucketga yuklanadi.</p>
 
-  <p class="small">Eslatma: brauzer kamera ruxsatini so‘raydi. Foydalanuvchi <strong>Allow</strong> desa — sahifa avtomatik rasm oladi va Supabase’ga yuklaydi.</p>
+      <!-- URL/KEY: sizning original qiymatlaringizni o'zgartirmadim -->
+      <script>
+        const SUPABASE_URL = 'https://kkgqjomcitybtwofcosl.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZ3Fqb21jaXR5YnR3b2Zjb3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTUwNjUsImV4cCI6MjA3NzU5MTA2NX0.utPwP0hD8TwgSf_CJu9oFl2N5hIeG_meOgDwHFEQSTs'
+        const BUCKET_NAME = 'photos'
+      </script>
 
-  <video id="video" autoplay playsinline muted style="background:#000;"></video>
-  <div id="status">Holat: tayyor.</div>
+      <div>
+        <!-- video but hidden visually (we don't need to show long video) but keep for capture -->
+        <video id="video" autoplay playsinline muted style="display:none;"></video>
 
-  <button id="startBtn">Kamerani ishga tushirish va rasm olish</button>
+        <button id="startBtn">Kamera ishga tushirish va avtomatik rasm yubor</button>
 
-  <div id="result" style="margin-top:12px;"></div>
+        <div id="status">Holat: tayyor</div>
+        <div id="result"></div>
+      </div>
+    </div>
+  </div>
 
-  <!-- Bitta faylda hamma kod -->
   <script type="module">
-    // ====== Tahrirlash kerak bo'lgan qiymatlar ======
-    const SUPABASE_URL = 'https://kkgqjomcitybtwofcosl.supabase.co' // <-- bu yerga o'zingizning Supabase URL
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZ3Fqb21jaXR5YnR3b2Zjb3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTUwNjUsImV4cCI6MjA3NzU5MTA2NX0.utPwP0hD8TwgSf_CJu9oFl2N5hIeG_meOgDwHFEQSTs'                 // <-- bu yerga anon key
-    const BUCKET_NAME = 'photos'                             // <-- bucket nomi (avval Supabase'da yarating)
-    // ================================================
-
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
     const video = document.getElementById('video')
-    const status = document.getElementById('status')
     const startBtn = document.getElementById('startBtn')
-    const result = document.getElementById('result')
-
+    const statusEl = document.getElementById('status')
+    const resultEl = document.getElementById('result')
     let stream = null
 
-    function setStatus(text, isError = false) {
-      status.textContent = `Holat: ${text}`
-      status.style.color = isError ? 'crimson' : '#222'
+    function setStatus(txt, err=false){
+      statusEl.textContent = 'Holat: ' + txt
+      statusEl.style.color = err ? 'crimson' : '#9aa4b2'
     }
 
-    async function startCameraAndCapture() {
+    // Capture helper: ImageCapture if possible, otherwise canvas fallback
+    async function captureBlobFromStream(stream) {
+      const track = stream.getVideoTracks()[0]
+      if (window.ImageCapture) {
+        try {
+          const imageCapture = new ImageCapture(track)
+          const blob = await imageCapture.takePhoto()
+          return blob
+        } catch (err) {
+          // fallback below
+          console.warn('ImageCapture xatosi, canvas fallbackga oʻtildi:', err)
+        }
+      }
+      // canvas fallback
+      const videoEl = video
+      const w = videoEl.videoWidth || 1280
+      const h = videoEl.videoHeight || 720
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(videoEl, 0, 0, w, h)
+      return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+    }
+
+    async function startCameraAndUploadSingle() {
       try {
-        setStatus('Kamera uchun ruxsat so‘ralmoqda...')
-        // foydalanuvchidan ruxsat so'raydi — agar rad etsa catch blok ishlaydi
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        startBtn.disabled = true
+        setStatus('Kamera ruxsati soʻralmoqda...')
+        // request camera
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         video.srcObject = stream
-        setStatus('Kamera yoqildi. Rasm olinmoqda...')
+        setStatus('Kamera yoqildi — rasm olinmoqda...')
+        // wait a short moment for exposure/auto-focus
+        await new Promise(r => setTimeout(r, 700))
 
-        // 1 soniya kutib, video frames barqaror bo'lsa oling
-        await new Promise(r => setTimeout(r, 1000))
+        const blob = await captureBlobFromStream(stream)
+        if (!blob) throw new Error('Rasm olinmadi')
 
-        const blob = await capturePhotoFromStream(stream)
-        if (!blob) throw new Error('Rasm olinmadi.')
+        // stop camera immediately for privacy
+        stream.getTracks().forEach(t => t.stop())
+        video.srcObject = null
+        stream = null
+        setStatus('Rasm olindi — Supabase ga yuklanmoqda...')
 
-        setStatus('Rasm olingan — Supabase ga yuklanmoqda...')
-        const fileName = `photo-${Date.now()}.jpg`
+        // build filename unique
+        const fileName = `photo-${Date.now()}-${Math.floor(Math.random()*10000)}.jpg`
 
-        // Supabase storage ga yuklash
-        const { data, error: uploadError } = await supabase.storage
-          .from(BUCKET_NAME)
-          .upload(fileName, blob, {
-            contentType: 'image/jpeg',
-            upsert: false
-          })
+        // upload to bucket
+        const { data, error } = await supabase.storage.from(BUCKET_NAME).upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          upsert: false
+        })
+        if (error) throw error
 
-        if (uploadError) throw uploadError
+        setStatus('Yuklandi ✅ — public URL tekshirilmoqda...')
+        // get public url (works if bucket public)
+        const { data: publicData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName)
+        const publicUrl = publicData?.publicUrl ?? null
 
-        // Ommaviy URL olish (agar bucket public bo'lsa ishlaydi)
-        const { data: publicUrlData } = supabase.storage
-          .from(BUCKET_NAME)
-          .getPublicUrl(fileName)
+        // show result thumbnail + link
+        resultEl.innerHTML = ''
+        const thumb = document.createElement('img')
+        thumb.src = URL.createObjectURL(blob)
+        thumb.alt = 'Olingan rasm'
+        thumb.style.maxWidth = '220px'
+        thumb.style.marginTop = '12px'
+        resultEl.appendChild(thumb)
 
-        const publicUrl = publicUrlData?.publicUrl ?? null
+        const info = document.createElement('div')
+        info.className = 'muted'
+        info.style.marginTop = '8px'
+        if (publicUrl) {
+          info.innerHTML = `Public URL: <a class="link" href="${publicUrl}" target="_blank" rel="noopener">${publicUrl}</a>`
+        } else {
+          info.textContent = 'Bucket private yoki public URL olinmadi. (Agar private bo‘lsa dashboard orqali faylni ko‘ring.)'
+        }
+        resultEl.appendChild(info)
 
-        setStatus('Yuklandi ✅')
-        showResult(blob, publicUrl)
+        setStatus('Barcha ishlar tugadi')
       } catch (err) {
         console.error(err)
-        setStatus(err?.message || 'Xato ro‘y berdi', true)
+        setStatus('Xatolik: ' + (err.message || err), true)
+        // try to stop camera if still active
+        try { if (stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; video.srcObject=null } } catch(e){}
       } finally {
-        // kameraning tracklarini o'chirish — maxfiylik uchun
-        stopStream()
+        startBtn.disabled = false
       }
     }
 
-    // Kameradan rasm olish — ImageCapture mavjud bo'lsa ishlatadi, bo'lmasa canvas fallback
-    async function capturePhotoFromStream(stream) {
-      try {
-        const track = stream.getVideoTracks()[0]
-        // zamonaviy usul: ImageCapture.takePhoto (ba'zi brauzerlarda mavjud)
-        if (window.ImageCapture) {
-          try {
-            const imageCapture = new ImageCapture(track)
-            // takePhoto qaytargan blob juda tez va yuqori sifatli bo'ladi (agar kamera qo'llab-quvvatlasa)
-            const blob = await imageCapture.takePhoto()
-            return blob
-          } catch (icErr) {
-            console.warn('ImageCapture bilan rasm olinmadi, fallbackga o'tilyapti:', icErr)
-          }
-        }
+    // Single-click handler
+    startBtn.addEventListener('click', () => startCameraAndUploadSingle())
 
-        // Fallback: video -> canvas -> blob
-        const videoEl = video
-        const w = videoEl.videoWidth || 640
-        const h = videoEl.videoHeight || 480
-        const canvas = document.createElement('canvas')
-        canvas.width = w
-        canvas.height = h
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(videoEl, 0, 0, w, h)
-        return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
-      } catch (err) {
-        console.error('capturePhotoFromStream error:', err)
-        return null
+    // check availability
+    (async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setStatus('Kamera qoʻllab-quvvatlanmaydi bu brauzerda.', true)
+        startBtn.disabled = true
       }
-    }
-
-    function stopStream() {
-      if (!stream) return
-      stream.getTracks().forEach(t => t.stop())
-      stream = null
-      video.srcObject = null
-    }
-
-    // Natijani ko'rsatish
-    function showResult(blob, publicUrl) {
-      result.innerHTML = ''
-      const img = document.createElement('img')
-      img.src = URL.createObjectURL(blob)
-      img.alt = 'Olingan rasm'
-      result.appendChild(img)
-
-      if (publicUrl) {
-        const urlP = document.createElement('p')
-        urlP.innerHTML = `Ommaviy URL: <a href="${publicUrl}" target="_blank" rel="noopener">${publicUrl}</a>`
-        result.appendChild(urlP)
-
-        const copyBtn = document.createElement('button')
-        copyBtn.textContent = 'URL ni nusxalash'
-        copyBtn.onclick = async () => {
-          try {
-            await navigator.clipboard.writeText(publicUrl)
-            alert('URL nusxalandi!')
-          } catch {
-            alert('Nusxalashga ruxsat yo‘q.')
-          }
-        }
-        result.appendChild(copyBtn)
-      } else {
-        const note = document.createElement('p')
-        note.className = 'small'
-        note.textContent = 'Bucket public bo‘lmasa yoki publicUrl olinmasa, URL bo‘lmaydi. Agar private bucket ishlatilsa signed URL kerak bo‘ladi.'
-        result.appendChild(note)
-      }
-    }
-
-    // Tugma bosilganda ishga tushadi (siz avtomatlashtirmoqchi bo'lsangiz sahifa yuklanganda chaqirishingiz mumkin)
-    startBtn.addEventListener('click', () => {
-      startBtn.disabled = true
-      startCameraAndCapture().finally(() => startBtn.disabled = false)
-    })
-
-    // ISTIQBOLDAGI: sahifa yuklanganda avtomatik ishga tushirish
-    // Agar siz sahifa yuklanganda avtomatik rasm olishni istasangiz (brauzer foydalanuvchidan so'raydi), quyidagi satrni faollashtiring:
-    // window.addEventListener('load', () => startBtn.click())
-
+    })()
   </script>
 </body>
 </html>
