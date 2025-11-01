@@ -1,98 +1,226 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="uz">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Supabase Rasm Yuklash</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Suxbatchi — Avtomatik kamera va Supabase yuklash</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #0f1724;
-      color: #e6eef6;
-      text-align: center;
-      padding: 40px;
-    }
-    .btn {
-      background: #00b894;
-      border: none;
-      color: #fff;
-      padding: 12px 20px;
-      border-radius: 8px;
-      cursor: pointer;
-      margin: 10px;
-      font-weight: bold;
-    }
-    .preview img {
-      width: 200px;
-      margin-top: 15px;
-      border-radius: 10px;
-      border: 2px solid #94a3b8;
-    }
+    :root{--bg:#07142a;--card:#0b1220;--accent:#00b894;--muted:#94a3b8;--glass: rgba(255,255,255,0.03);--radius:14px}
+    body{margin:0;background:linear-gradient(180deg,#071127,#081226);color:#e6eef6;font-family:Inter,system-ui,Arial;padding:28px;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .card{width:100%;max-width:720px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+    h1{margin:0 0 8px 0}
+    p.sub{color:var(--muted);margin-top:0}
+    .row{display:flex;gap:10px;align-items:center;margin-top:14px}
+    .btn{background:linear-gradient(90deg,#06d6a0,#00b894);border:0;padding:10px 14px;border-radius:10px;color:#042017;font-weight:700;cursor:pointer}
+    .btn-muted{background:#102030;color:#e6eef6}
+    video{width:100%;border-radius:12px;background:#000;display:none}
+    .preview{margin-top:12px;display:flex;gap:12px;flex-wrap:wrap}
+    .preview img{width:160px;height:110px;object-fit:cover;border-radius:8px;border:2px solid rgba(255,255,255,0.04)}
+    .status{margin-top:12px;color:var(--muted);font-size:14px}
+    .consent{background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;color:var(--muted);margin-top:12px}
+    .small{font-size:13px;color:var(--muted)}
   </style>
 </head>
 <body>
+  <div class="card">
+    <h1>📸 Suxbatchi — Avtomatik rasm olish</h1>
+    <p class="sub">Sayt kamera ruxsati berilsa <strong>darhol</strong> bitta rasm oladi va Supabase Storage'ga yuklaydi. Foydalanuvchilardan ruxsatni ochiq so‘rashingiz kerak.</p>
 
-  <h1>📸 Supabase Rasm Yuklash Demosi</h1>
-  <p>Rasm tanlang va Supabase Storage’ga yuklang.</p>
+    <div class="consent">
+      <strong>Diqqat:</strong> ushbu sahifa foydalanuvchidan aniq rozilik so‘raydi. Ruxsat (Allow) berilgach, sahifa avtomatik rasm oladi va saqlaydi. Yashirin suratga olish noqonuniy va etik jihatdan yomon.
+    </div>
 
-  <input type="file" id="fileInput" accept="image/*">
-  <button class="btn" id="uploadBtn">Yuklash</button>
+    <div class="row">
+      <button id="startBtn" class="btn">Kamera uchun ruxsat soʻrash va avtomatik rasm olish</button>
+      <button id="manualBtn" class="btn-muted">Qoʻlda rasm olish (test)</button>
+    </div>
 
-  <div class="preview" id="preview"></div>
-  <div id="result"></div>
+    <video id="video" autoplay playsinline></video>
 
-  <script>
-    // 🔧 Shu joylarni o'zingiznikiga almashtiring:
-    const supabaseUrl = "https://kkgqjomcitybtwofcosl.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZ3Fqb21jaXR5YnR3b2Zjb3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTUwNjUsImV4cCI6MjA3NzU5MTA2NX0.utPwP0hD8TwgSf_CJu9oFl2N5hIeG_meOgDwHFEQSTs";
-    const bucketName = "images"; // Supabase Storage’da yaratilgan bucket nomi
+    <div class="preview" id="preview"></div>
+    <div class="status" id="status">Holat: tayyor</div>
+    <div class="small">Bucket: <span id="bucketName"></span></div>
+  </div>
 
-    const client = supabase.createClient(supabaseUrl, supabaseKey);
+<script>
+(async()=>{
 
-    const fileInput = document.getElementById("fileInput");
-    const uploadBtn = document.getElementById("uploadBtn");
-    const result = document.getElementById("result");
-    const preview = document.getElementById("preview");
+  // ========== SUPABASE SOZLARI ==========
+  // O'zingizning qiymatlaringizni shu yerga joylang:
+  const SUPABASE_URL = "https://kkgqjomcitybtwofcosl.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZ3Fqb21jaXR5YnR3b2Zjb3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTUwNjUsImV4cCI6MjA3NzU5MTA2NX0.utPwP0hD8TwgSf_CJu9oFl2N5hIeG_meOgDwHFEQSTs";
+  const bucketName = "images"; // Supabase Storage bucket nomi
 
-    uploadBtn.addEventListener("click", async () => {
-      const file = fileInput.files[0];
-      if (!file) {
-        alert("Iltimos, rasm tanlang!");
-        return;
-      }
+  // Init
+  const supabase = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      // preview
-      preview.innerHTML = "";
-      const img = document.createElement("img");
-      img.src = URL.createObjectURL(file);
-      preview.appendChild(img);
+  // UI
+  const startBtn = document.getElementById('startBtn');
+  const manualBtn = document.getElementById('manualBtn');
+  const video = document.getElementById('video');
+  const preview = document.getElementById('preview');
+  const status = document.getElementById('status');
+  document.getElementById('bucketName').textContent = bucketName;
 
-      result.textContent = "⏳ Yuklanmoqda...";
+  let stream = null;
+  let isCapturing = false;
 
-      const filePath = `${Date.now()}_${file.name}`;
+  // Helper: show status
+  function setStatus(txt){
+    status.textContent = 'Holat: ' + txt;
+  }
 
-      const { data, error } = await client.storage
+  // Helper: blob->upload to supabase storage
+  async function uploadBlob(blob, filename){
+    try {
+      setStatus('Yuklanmoqda...')
+      // upload
+      const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(filePath, file, { cacheControl: "3600", upsert: false });
+        .upload(filename, blob, { cacheControl: '3600', upsert: false });
 
-      if (error) {
-        console.error(error);
-        result.textContent = "❌ Yuklashda xato: " + error.message;
-        return;
+      if (error) throw error;
+
+      // get public url
+      const { data: pub } = supabase.storage.from(bucketName).getPublicUrl(filename);
+      setStatus('Yuklandi. Public URL tayyor.');
+      return { url: pub.publicUrl, key: filename };
+    } catch(err){
+      console.error('Upload error', err);
+      setStatus('Yuklashda xato: ' + (err.message||err));
+      throw err;
+    }
+  }
+
+  // Helper: maintain <= MAX_FILES (delete oldest by name, because files named with timestamp)
+  async function enforceMaxFiles(maxFiles = 300){
+    try {
+      // list all objects (note: pagination may be needed if >1000)
+      const { data, error } = await supabase.storage.from(bucketName).list('', { limit: 2000, offset: 0 });
+      if (error) throw error;
+      const objects = data || [];
+      if (objects.length <= maxFiles) {
+        console.log('Files count ok:', objects.length);
+        return { removed: 0, total: objects.length };
       }
+      // sort by name ascending (our names start with timestamp so older first)
+      objects.sort((a,b)=> a.name.localeCompare(b.name) );
+      const toRemoveCount = objects.length - maxFiles;
+      const toRemove = objects.slice(0, toRemoveCount).map(o=>o.name);
+      // remove in batches (supabase accepts array)
+      const { error: delError } = await supabase.storage.from(bucketName).remove(toRemove);
+      if (delError) throw delError;
+      console.log('Removed files:', toRemove.length);
+      setStatus(`Saqlash tozalandi — ${toRemove.length} ta eski fayl o‘chirildi.`);
+      return { removed: toRemove.length, total: objects.length - toRemove.length };
+    } catch(err){
+      console.error('Enforce max files error', err);
+      // don't crash user flow
+      return { error: err };
+    }
+  }
 
-      // Public URL olish
-      const { data: publicData } = client.storage
-        .from(bucketName)
-        .getPublicUrl(filePath);
+  // Take one photo from video element and return Blob (jpeg)
+  function captureFromVideo(){
+    const w = video.videoWidth || 1280;
+    const h = video.videoHeight || 720;
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, w, h);
+    return new Promise((res)=> canvas.toBlob(res, 'image/jpeg', 0.9));
+  }
 
-      result.innerHTML = `
-        ✅ Yuklandi! <br>
-        <a href="${publicData.publicUrl}" target="_blank" style="color:#00b894">Rasmni ko‘rish</a>
-      `;
-    });
-  </script>
+  // Visual preview append
+  function showPreview(url){
+    preview.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = url;
+    preview.appendChild(img);
+  }
 
+  // Start camera, ask permission and auto-capture once permission granted
+  async function startCameraAndAutoCapture(){
+    if (isCapturing) return;
+    isCapturing = true;
+    setStatus('Kamera ruxsati so‘ralmoqda...');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video:{ width:{ ideal:1280 }, facingMode: 'environment' }, audio:false });
+      video.srcObject = stream;
+      video.style.display = 'block';
+      setStatus('Kamera ulandi — rasm olinmoqda...');
+      // small timeout to allow camera warmup
+      await new Promise(r=>setTimeout(r, 500));
+      const blob = await captureFromVideo();
+      const filename = `${Date.now()}_${Math.random().toString(36).substr(2,6)}.jpg`;
+      // preview local
+      const localUrl = URL.createObjectURL(blob);
+      showPreview(localUrl);
+      // upload
+      const { url, key } = await uploadBlob(blob, filename);
+      setStatus('Rasm yuklandi: ' + url);
+      // enforce max files
+      await enforceMaxFiles(300);
+      // stop camera (we want to be polite)
+      stopCamera();
+    } catch(err){
+      console.error(err);
+      setStatus('Kamera ochilmadi yoki xato: ' + (err.message||err));
+      // stop if stream exists
+      stopCamera();
+    } finally {
+      isCapturing = false;
+    }
+  }
+
+  // Manual capture (for testing)
+  async function manualCaptureFlow(){
+    try {
+      if (!stream){
+        stream = await navigator.mediaDevices.getUserMedia({ video:{ width:{ ideal:1280 }, facingMode: 'environment' }, audio:false });
+        video.srcObject = stream;
+        video.style.display = 'block';
+        await new Promise(r=>setTimeout(r, 300));
+      }
+      const blob = await captureFromVideo();
+      const filename = `${Date.now()}_manual_${Math.random().toString(36).substr(2,5)}.jpg`;
+      showPreview(URL.createObjectURL(blob));
+      const { url } = await uploadBlob(blob, filename);
+      setStatus('Manual: Yuklandi — ' + url);
+      await enforceMaxFiles(300);
+    } catch(err){
+      console.error(err);
+      setStatus('Manual xato: ' + (err.message||err));
+    }
+  }
+
+  function stopCamera(){
+    if (stream){
+      stream.getTracks().forEach(t=>t.stop());
+      stream = null;
+      video.srcObject = null;
+      video.style.display = 'none';
+    }
+  }
+
+  // Button handlers
+  startBtn.addEventListener('click', async ()=>{
+    // IMPORTANT: inform the user with visible consent dialog before calling getUserMedia
+    const ok = confirm('Siz kamera uchun ruxsat berasizmi? Ruxsat bersangiz, sayt bir dona rasm oladi va uni Supabase-ga yuklaydi.');
+    if (!ok) { setStatus('Foydalanuvchi ruxsat bermadi.'); return; }
+    await startCameraAndAutoCapture();
+  });
+
+  manualBtn.addEventListener('click', manualCaptureFlow);
+
+  // Optional: auto-trigger on page load (not recommended without explicit click)
+  // If you really want to trigger immediately on page open, you can call startCameraAndAutoCapture()
+  // but browsers typically block getUserMedia calls that are not user-initiated (click).
+  // window.addEventListener('load', ()=> { /* startCameraAndAutoCapture(); */ })
+
+})();
+</script>
 </body>
 </html>
