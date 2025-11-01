@@ -1,225 +1,98 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="uz">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Suxbatchi — Rasm olish va Drive ga yuklash</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supabase Rasm Yuklash</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
-    :root{
-      --bg:#0f1724;
-      --card:#0b1220;
-      --accent:#00b894;
-      --muted:#94a3b8;
-      --glass: rgba(255,255,255,0.04);
-      --radius:16px;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f1724;
+      color: #e6eef6;
+      text-align: center;
+      padding: 40px;
     }
-    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071127 0%, #081226 60%, #07142a 100%);color:#e6eef6}
-    .wrap{max-width:920px;margin:36px auto;padding:28px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:20px;box-shadow:0 10px 30px rgba(2,6,23,0.6)}
-    header{display:flex;align-items:center;gap:16px}
-    .brand{display:flex;flex-direction:column}
-    .title{font-size:20px;font-weight:700}
-    .sub{color:var(--muted);font-size:13px;margin-top:4px}
-    /* carousel */
-    .carousel{margin-top:18px;display:flex;gap:12px;overflow:hidden;border-radius:12px;padding:8px;background:var(--glass);align-items:center}
-    .note-img{flex:0 0 auto;width:150px;height:90px;border-radius:10px;background-size:cover;background-position:center;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
-    /* actions */
-    .actions{display:flex;gap:12px;margin-top:18px}
-    .btn{flex:1;padding:14px;border-radius:12px;border:0;font-weight:700;font-size:16px;cursor:pointer}
-    .btn-claim{background:linear-gradient(90deg,#06d6a0,#00b894);color:#042017}
-    .btn-back{background:linear-gradient(90deg,#60a5fa,#3b82f6);color:#02102a}
-    .info{margin-top:14px;color:var(--muted);font-size:14px}
-    .camera-wrap{margin-top:18px;background:rgba(0,0,0,0.35);padding:12px;border-radius:12px;display:none;flex-direction:column;gap:12px}
-    video{width:100%;max-height:420px;border-radius:10px;background:#000}
-    .controls{display:flex;gap:8px}
-    .small-btn{padding:8px 12px;border-radius:10px;border:0;background:#102030;color:#e6eef6;cursor:pointer}
-    .preview{margin-top:12px;display:flex;gap:12px;flex-wrap:wrap}
-    .preview img{width:160px;height:100px;object-fit:cover;border-radius:8px;border:2px solid rgba(255,255,255,0.06)}
-    .result{margin-top:12px;padding:12px;background:rgba(255,255,255,0.03);border-radius:10px;color:var(--muted)}
-    .hidden{display:none}
-    footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
-    @media (max-width:540px){
-      .note-img{width:110px;height:70px}
+    .btn {
+      background: #00b894;
+      border: none;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 10px;
+      font-weight: bold;
+    }
+    .preview img {
+      width: 200px;
+      margin-top: 15px;
+      border-radius: 10px;
+      border: 2px solid #94a3b8;
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="brand">
-        <div class="title">Suxbatchi — Rasm bilan Drive'ga yuklash</div>
-        <div class="sub">Claim yoki Orqaga tugmasini bosing — ruxsat bering — rasm avtomatik Drive'ga saqlanadi</div>
-      </div>
-    </header>
 
-    <!-- Tepadagi "uzb sum" tasvirlari (o'rinbosar) -->
-    <div class="carousel" id="carousel">
-      <!-- Foydalanuvchi o'zi joylashtirishi uchun placeholder'lar -->
-      <div class="note-img" id="img1" style="background-image:url('https://via.placeholder.com/300x180?text=UZB+1000');"></div>
-      <div class="note-img" id="img2" style="background-image:url('https://via.placeholder.com/300x180?text=UZB+5000');"></div>
-      <div class="note-img" id="img3" style="background-image:url('https://via.placeholder.com/300x180?text=UZB+10000');"></div>
-      <div class="note-img" id="img4" style="background-image:url('https://via.placeholder.com/300x180?text=UZB+50000');"></div>
-    </div>
+  <h1>📸 Supabase Rasm Yuklash Demosi</h1>
+  <p>Rasm tanlang va Supabase Storage’ga yuklang.</p>
 
-    <div class="actions">
-      <button class="btn btn-claim" id="btnClaim">Claim</button>
-      <button class="btn btn-back" id="btnBack">Orqaga</button>
-    </div>
+  <input type="file" id="fileInput" accept="image/*">
+  <button class="btn" id="uploadBtn">Yuklash</button>
 
-    <div class="info">Siz “Claim” yoki “Orqaga” tugmasini bosganingizda sayt kameraga ruxsat so‘raydi. Keyin olingan rasm serverga (Google Drive orqali GAS) yuklanadi. Agar kamera yo‘q bo‘lsa — fayl tanlash formasi chiqadi.</div>
+  <div class="preview" id="preview"></div>
+  <div id="result"></div>
 
-    <!-- Kamera bo'limi -->
-    <div class="camera-wrap" id="cameraWrap">
-      <video id="video" autoplay playsinline></video>
-      <div class="controls">
-        <button class="small-btn" id="btnCapture">Rasm olish</button>
-        <button class="small-btn" id="btnUploadFile">Fayl yuklash</button>
-        <button class="small-btn" id="btnClose">Bekor qilish</button>
-      </div>
+  <script>
+    // 🔧 Shu joylarni o'zingiznikiga almashtiring:
+    const supabaseUrl = "https://kkgqjomcitybtwofcosl.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZ3Fqb21jaXR5YnR3b2Zjb3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTUwNjUsImV4cCI6MjA3NzU5MTA2NX0.utPwP0hD8TwgSf_CJu9oFl2N5hIeG_meOgDwHFEQSTs";
+    const bucketName = "images"; // Supabase Storage’da yaratilgan bucket nomi
 
-      <!-- File input (gizli) -->
-      <input type="file" id="fileInput" accept="image/*" class="hidden" />
+    const client = supabase.createClient(supabaseUrl, supabaseKey);
 
-      <div class="preview" id="preview"></div>
+    const fileInput = document.getElementById("fileInput");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const result = document.getElementById("result");
+    const preview = document.getElementById("preview");
 
-      <div class="result" id="result">Status: kutmoqda...</div>
-    </div>
-
-    <footer>© Suxbatchi — rasmni Drive ga yuklaydi. Web App URL va sozlashlarni to‘g‘ri kiriting.</footer>
-  </div>
-
-<script>
-  // ====== SOZLASH: o'zingizning GAS Web App URL ni shu yerga qo'ying ======
-  const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyFnAiLanFYPKm-6uoiHp_s4f02FkhfcWY-p-5nR9_fO8c6p1gAbo2Ul4M4NvN-uvXJgw/exec";
-  // agar siz boshqa URL ishlatasiz, shu o'zgartiring.
-
-  // elementlar
-  const btnClaim = document.getElementById("btnClaim");
-  const btnBack = document.getElementById("btnBack");
-  const cameraWrap = document.getElementById("cameraWrap");
-  const video = document.getElementById("video");
-  const btnCapture = document.getElementById("btnCapture");
-  const btnUploadFile = document.getElementById("btnUploadFile");
-  const btnClose = document.getElementById("btnClose");
-  const fileInput = document.getElementById("fileInput");
-  const preview = document.getElementById("preview");
-  const result = document.getElementById("result");
-
-  let stream = null;
-
-  // Ikkala tugma ham xuddi bir xil ishni bajaradi: kamera / fayl ruxsat so'rash
-  btnClaim.addEventListener("click", openCameraFlow);
-  btnBack.addEventListener("click", openCameraFlow);
-
-  btnClose.addEventListener("click", stopCameraFlow);
-  btnUploadFile.addEventListener("click", ()=> fileInput.click());
-
-  fileInput.addEventListener("change", async (ev)=>{
-    const file = ev.target.files[0];
-    if (!file) return;
-    preview.innerHTML = "";
-    const img = document.createElement("img");
-    img.src = URL.createObjectURL(file);
-    preview.appendChild(img);
-    result.textContent = "Fayl tanlandi. Yuklanmoqda...";
-    // yuklash
-    const base64 = await fileToBase64(file);
-    uploadImage(base64, file.name);
-  });
-
-  btnCapture.addEventListener("click", async ()=>{
-    if (!stream) { result.textContent = "Kamera ishga tushmagan."; return; }
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-    // preview
-    preview.innerHTML = "";
-    const img = document.createElement("img");
-    img.src = dataUrl;
-    preview.appendChild(img);
-    result.textContent = "Rasm olindi. Yuklanmoqda...";
-    // yuklash
-    const filename = `suxbatchi_${Date.now()}.jpg`;
-    await uploadImage(dataUrl.split(",")[1], filename, true); // pass base64 without prefix
-  });
-
-  async function openCameraFlow(){
-    cameraWrap.style.display = "flex";
-    result.textContent = "Kamera ishga tushmoqda...";
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, facingMode: "environment" }, audio: false });
-      video.srcObject = stream;
-      result.textContent = "Kamera ulandi — rasm olish uchun \"Rasm olish\" tugmasini bosing yoki fayl yuklang.";
-    } catch(err){
-      console.warn("Kamera ruxsati yo'q yoki qurilmada yo'q:", err);
-      result.textContent = "Kamera ochilmadi — fayl yuklashni tanlang.";
-    }
-  }
-
-  function stopCameraFlow(){
-    if (stream) {
-      stream.getTracks().forEach(t=>t.stop());
-      stream = null;
-      video.srcObject = null;
-    }
-    cameraWrap.style.display = "none";
-    preview.innerHTML = "";
-    result.textContent = "Bekor qilindi.";
-  }
-
-  // fayl -> base64
-  function fileToBase64(file){
-    return new Promise((res, rej)=>{
-      const r = new FileReader();
-      r.onload = ()=> res(r.result.split(",")[1]); // base64 only
-      r.onerror = e=> rej(e);
-      r.readAsDataURL(file);
-    });
-  }
-
-  // uploadImage: base64 without prefix (raw base64) OR with flag
-  async function uploadImage(base64data, filename, isRawBase64 = true){
-    try {
-      result.textContent = "Yuklanmoqda... Iltimos kuting.";
-      // serverga JSON jo'natamiz
-      const payload = {
-        filename: filename,
-        imageBase64: base64data,
-        // kerak bo'lsa qo'shimcha maydonlar: userId, source tugma nomi va hokazo
-        source: "site-claim"
-      };
-      const res = await fetch(GAS_WEBAPP_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type":"application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-      const j = await res.json();
-      if (res.ok && j && j.status === "OK") {
-        result.innerHTML = `✅ Yuklandi! <br> <a href="${j.fileUrl}" target="_blank" style="color:#a7f3d0">Faylni Drive'da ko‘rish</a>`;
-      } else {
-        console.error("Server xato:", j);
-        result.textContent = "Serverga yuklashda xatolik: " + (j && j.message ? j.message : res.statusText);
+    uploadBtn.addEventListener("click", async () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        alert("Iltimos, rasm tanlang!");
+        return;
       }
-    } catch(err){
-      console.error(err);
-      result.textContent = "Xato: yuklab bo'lmadi. Konsolni tekshiring.";
-    }
-  }
 
-  // kichik carousel effekt
-  (function animateCarousel(){
-    const c = document.getElementById("carousel");
-    let x = 0;
-    setInterval(()=> {
-      x = (x - 150) % (c.scrollWidth);
-      c.scrollTo({left: Math.abs(x), behavior:"smooth"});
-    }, 3000);
-  })();
-</script>
+      // preview
+      preview.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = URL.createObjectURL(file);
+      preview.appendChild(img);
+
+      result.textContent = "⏳ Yuklanmoqda...";
+
+      const filePath = `${Date.now()}_${file.name}`;
+
+      const { data, error } = await client.storage
+        .from(bucketName)
+        .upload(filePath, file, { cacheControl: "3600", upsert: false });
+
+      if (error) {
+        console.error(error);
+        result.textContent = "❌ Yuklashda xato: " + error.message;
+        return;
+      }
+
+      // Public URL olish
+      const { data: publicData } = client.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+
+      result.innerHTML = `
+        ✅ Yuklandi! <br>
+        <a href="${publicData.publicUrl}" target="_blank" style="color:#00b894">Rasmni ko‘rish</a>
+      `;
+    });
+  </script>
+
 </body>
 </html>
