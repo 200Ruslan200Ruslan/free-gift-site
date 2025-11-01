@@ -1,184 +1,40 @@
-<!doctype html>
-<html lang="uz">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Suxbatchi — Avtomatik rasm olish (consent required)</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+// ==== SUPABASE ====
+import { createClient } from 'https://esm.sh/@supabase/supabase-js'
 
-  <style>
-    :root{--bg:#07142a;--card:#0b1220;--accent:#00b894;--muted:#94a3b8}
-    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071127,#081226);font-family:Inter,system-ui,Arial;color:#e6eef6}
-    .wrap{max-width:720px;margin:40px auto;padding:22px;background:rgba(255,255,255,0.02);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,0.5)}
-    h1{margin:0 0 8px 0;font-size:24px}
-    p{margin:0;color:var(--muted)}
-    .status{margin-top:12px;color:var(--muted)}
-    .big-btn{margin-top:18px;width:100%;padding:14px;border-radius:12px;border:0;background:linear-gradient(90deg,#06d6a0,#00b894);color:#042017;font-weight:800;font-size:16px;cursor:pointer}
-    /* Consent modal */
-    .modal {position:fixed;inset:0;background:linear-gradient(180deg,rgba(2,6,23,0.7),rgba(2,6,23,0.9));display:flex;align-items:center;justify-content:center;z-index:9999}
-    .consent-box{width:90%;max-width:560px;background:#07142a;padding:22px;border-radius:14px;border:1px solid rgba(255,255,255,0.03)}
-    .consent-title{font-size:20px;margin-bottom:8px}
-    .consent-text{color:var(--muted);margin-bottom:12px}
-    .consent-actions{display:flex;gap:10px}
-    .btn-muted{background:#102030;color:#e6eef6;border-radius:10px;padding:10px 12px;border:0;cursor:pointer;flex:1}
-    .btn-accept{background:linear-gradient(90deg,#06d6a0,#00b894);color:#042017;border-radius:10px;padding:10px 12px;border:0;cursor:pointer;flex:1}
-    video{display:none}
-    .preview{margin-top:12px}
-    .preview img{width:100%;border-radius:10px;max-height:320px;object-fit:cover}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <h1>📸 Suxbatchi</h1>
-    <p>Sayt kamera uchun ruxsat bersangiz — darhol bitta rasm olinadi va Supabase Storage'ga yuklanadi.</p>
+// Supabase ma'lumotlaringiz:
+const SUPABASE_URL = 'https://kkgqjomcitybtwofcosl.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZ3Fqb21jaXR5YnR3b2Zjb3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTUwNjUsImV4cCI6MjA3NzU5MTA2NX0.utPwP0hD8TwgSf_CJu9oFl2N5hIeG_meOgDwHFEQSTs'
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-    <div class="status" id="status">Holat: kutmoqda</div>
+// ==== Rasm yuklash funksiyasi ====
+async function uploadImage(base64data, filename, isRawBase64 = true) {
+  try {
+    result.textContent = "Yuklanmoqda... Iltimos kuting."
 
-    <div class="preview" id="preview"></div>
-  </div>
-
-  <!-- Consent modal (must be explicit) -->
-  <div id="consentModal" class="modal" aria-hidden="false">
-    <div class="consent-box" role="dialog" aria-modal="true">
-      <div class="consent-title">Rozilik talab qilinadi</div>
-      <div class="consent-text">
-        Ushbu sayt sizdan kamera uchun ruxsat so‘raydi. Agar siz <strong>Allow</strong> (ruxsat) bersangiz, sayt bitta surat oladi va uni <em>Supabase Storage</em>ga yuklaydi. Yashirincha yoki foydalanuvchini aldagan tarzda suratga olish noqonuniy va axloqan noto‘g‘ri.
-      </div>
-      <div class="consent-actions">
-        <button id="declineBtn" class="btn-muted">Rad etish</button>
-        <button id="acceptBtn" class="btn-accept">Men roziman — ruxsat so‘rashni boshlash</button>
-      </div>
-    </div>
-  </div>
-
-  <video id="video" autoplay playsinline muted></video>
-
-<script>
-(async ()=> {
-  // ========== O'Z SUPABASE MALUMOTLARINGIZNI BU YERGA KO'YING ==========
-  const SUPABASE_URL = "https://kkgqjomcitybtwofcosl.supabase.co"; // <-- o'zgartiring
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZ3Fqb21jaXR5YnR3b2Zjb3NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTUwNjUsImV4cCI6MjA3NzU5MTA2NX0.utPwP0hD8TwgSf_CJu9oFl2N5hIeG_meOgDwHFEQSTs"; // <-- o'zgartiring (anon public key)
-  const BUCKET = "images"; // siz yaratgan public bucket
-  // ==================================================================
-
-  const client = supabaseJs.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  const consentModal = document.getElementById('consentModal');
-  const acceptBtn = document.getElementById('acceptBtn');
-  const declineBtn = document.getElementById('declineBtn');
-  const statusEl = document.getElementById('status');
-  const preview = document.getElementById('preview');
-  const video = document.getElementById('video');
-
-  function setStatus(t){ statusEl.textContent = 'Holat: ' + t; }
-
-  // Attempt to request camera immediately AFTER explicit consent click.
-  async function requestCameraAndCapture() {
-    setStatus('Kamera ruxsati so‘ralmoqda...');
-    let stream = null;
-    try {
-      // Some browsers (mobile Safari) block non-user gestures. Because we are calling
-      // this INSIDE an explicit click handler (acceptBtn), it has much higher chance to succeed.
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
-      video.srcObject = stream;
-      // show video element briefly (hidden visually, but needed to render frame)
-      video.style.display = 'block';
-      // give camera time to warm up (esp. on mobile)
-      await new Promise(r => setTimeout(r, 800));
-
-      // capture frame to canvas
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // convert to blob (jpeg)
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
-
-      // stop tracks asap
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      video.srcObject = null;
-      video.style.display = 'none';
-
-      setStatus('Rasm olinmoqda va yuklanmoqda...');
-
-      // generate filename
-      const filename = `auto_${Date.now()}_${Math.random().toString(36).slice(2,8)}.jpg`;
-
-      // upload to Supabase Storage
-      const { data, error } = await client.storage.from(BUCKET).upload(filename, blob, { cacheControl: '3600', upsert: false });
-
-      if (error) throw error;
-
-      // get public url
-      const { data: publicData } = client.storage.from(BUCKET).getPublicUrl(filename);
-
-      // show preview (so owner knows a photo was taken)
-      preview.innerHTML = `<a href="${publicData.publicUrl}" target="_blank" style="text-decoration:none;color:inherit"><img src="${publicData.publicUrl}" alt="Uploaded image" /></a>`;
-      setStatus('✅ Rasm yuklandi — ko‘rish uchun bosing.');
-    } catch (err) {
-      console.error('capture error', err);
-      // Detect common cases
-      if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
-        setStatus('Kamera ruxsati bloklandi yoki rad etildi (NotAllowed).');
-      } else if (err && err.name === 'NotFoundError') {
-        setStatus('Qurilmada kamera topilmadi.');
-      } else {
-        setStatus('Xato: ' + (err.message || err));
-      }
-
-      // Show a clear fallback: a single big "Bosish bilan boshlash" button overlay if browser blocked automatic call.
-      showFallbackStartButton();
+    // Base64 → Blob aylantiramiz
+    const byteCharacters = atob(base64data)
+    const byteNumbers = new Array(byteCharacters.length)
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
     }
+    const byteArray = new Uint8Array(byteNumbers)
+    const blob = new Blob([byteArray], { type: 'image/jpeg' })
+
+    // Supabase Storage'ga yuklash
+    const { data, error } = await supabase.storage
+      .from('images')        // bucket nomi
+      .upload(filename, blob, { upsert: true }) // mavjud bo'lsa yangilaydi
+
+    if (error) throw error
+
+    // Public URL olish
+    const { data: publicData } = supabase.storage
+      .from('images')
+      .getPublicUrl(filename)
+
+    result.innerHTML = `✅ Yuklandi!<br><a href="${publicData.publicUrl}" target="_blank" style="color:#a7f3d0">Rasmni ko‘rish</a>`
+  } catch (err) {
+    console.error(err)
+    result.textContent = "❌ Yuklashda xato: " + err.message
   }
-
-  function hideConsent() {
-    consentModal.style.display = 'none';
-    consentModal.setAttribute('aria-hidden','true');
-  }
-
-  function showFallbackStartButton(){
-    // create a large visible button for manual start if needed
-    if (document.getElementById('fallbackStartBtn')) return;
-    const btn = document.createElement('button');
-    btn.id = 'fallbackStartBtn';
-    btn.className = 'big-btn';
-    btn.textContent = 'Kamera uchun ruxsat berib rasm olish (bosish bilan)';
-    btn.style.position = 'fixed';
-    btn.style.left = '50%';
-    btn.style.transform = 'translateX(-50%)';
-    btn.style.bottom = '24px';
-    btn.style.zIndex = 9998;
-    document.body.appendChild(btn);
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      btn.textContent = 'Ishlayapti...';
-      await requestCameraAndCapture();
-      btn.remove();
-    });
-  }
-
-  // Accept button: hide modal and try to request camera immediately
-  acceptBtn.addEventListener('click', async () => {
-    hideConsent();
-    setStatus('Consent berildi. Kamera chaqirilmoqda...');
-    // Try immediately — this is a user gesture (click), so browsers allow getUserMedia.
-    await requestCameraAndCapture();
-  });
-
-  declineBtn.addEventListener('click', () => {
-    setStatus('Foydalanuvchi ruxsat bermadi (declined).');
-    // hide modal and do nothing
-    hideConsent();
-  });
-
-  // Optional: auto-focus and try to call getUserMedia without click (most browsers will block).
-  // We do NOT call it automatically to respect consent flow. Only attempt after user click.
-  // If you still want to attempt automatic permission prompt on page load (not recommended), uncomment:
-  // window.addEventListener('load', () => { /* try requestCameraAndCapture(); */ });
-
-})();
-</script>
-</body>
-</html>
+}
